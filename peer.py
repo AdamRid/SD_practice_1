@@ -1,9 +1,11 @@
 from pyactor.context import set_context, create_host, sleep, serve_forever, interval
 from pyactor.exceptions import TimeoutError
+import threading
+import sys
 
 
 class Peer(object):
-    _tell = ['announce_2_tracker', 'init_start', 'stop_interval', 'test']
+    _tell = ['announce_2_tracker', 'init_start', 'stop_interval']
     _ask = []
     _ref = []
 
@@ -21,22 +23,27 @@ class Peer(object):
     def announce_2_tracker(self):
         if self.tracker and self.torrent_hash:
             tracker.announce(self.torrent_hash, str(self.proxy))
+        print self.id + ' make an announce'
 
     def stop_interval(self):
         print "stopping interval"
         self.interval1.set()
 
-    def test(self):
-        print self.proxy
-
 
 if __name__ == "__main__":
-    set_context()
-    h = create_host('http://127.0.0.1:1679/')
+    if len(sys.argv) == 4:
+        host_port = sys.argv[1]
+        actor_id = sys.argv[2]
+        hash = sys.argv[3]
 
-    tracker = h.lookup_url('http://127.0.0.1:1277/tracker', 'Tracker', 'tracker')
+        set_context()
+        h = create_host('http://127.0.0.1:' + host_port + '/')
+        print h
+        tracker = h.lookup_url('http://127.0.0.1:1277/tracker', 'Tracker', 'tracker')
+        p1 = h.spawn(actor_id, Peer)
+        print actor_id
+        p1.init_start(tracker, hash)
+        serve_forever()
+    else:
+        print 'Argument\'s number error to execute the peer'
 
-    p1 = h.spawn('peer1', Peer)
-    p1.init_start(tracker, 'hash_1')
-
-    serve_forever()
