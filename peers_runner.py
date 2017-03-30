@@ -14,12 +14,12 @@ if __name__ == "__main__":
     hash = 'hash0'
     threads = list()
     num_peer = 0
-    for port in range(1650, 1750):
+    for port in range(1650, 1660):
         actor = 'peer' + str(num_peer)
 
         t = threading.Thread(target=run_peer, args=(peer_script, str(port), str(actor),
                                                     hash))
         threads.append(t)
         t.start()
-        time.sleep(1)
         num_peer += 1
+        time.sleep(1)
