@@ -78,8 +78,8 @@ class Peer(object):
         if chunk_id not in self.available_chunks_id:
             self.available_chunks_id.append(chunk_id)
             self.chunk_dic[chunk_id] = chunk_data
-        elif False:
-
+        elif True:
+            # ---- Debug's lines ---
             if len(self.available_chunks_id) == 10:
                 print self.id + " has got all chunks!"
             else:

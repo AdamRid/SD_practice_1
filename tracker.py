@@ -51,18 +51,17 @@ class Tracker(object):
             #  Caso en que haya mas de tres peers en el swarm
             if num_peers > 3:
                 random_nums = []
-                for i in range(0, 3):
+                for i in range(3):
                     # Escogemos un numero aleatorio entre 0 y num_peers
                     random_num = random.randrange(num_peers)
                     # Comprobamos que no lo tengamos seleccionado
                     while random_num in random_nums:
                         random_num = random.randrange(num_peers)
+                    peers_2_return.append(self.swarmDic[torrent_hash][peers_key[random_num]][0])
                     random_nums.append(random_num)
-                for i in range(0, 3):
-                    peers_2_return.append(self.swarmDic[torrent_hash][peers_key[random_nums[i]]][0])
             else:
                 # Si disponemos menos de 3 devolvemos todos
-                for i in range(0, num_peers):
+                for i in range(num_peers):
                     peers_2_return.append(self.swarmDic[torrent_hash][peers_key[i]][0])
 
         return peers_2_return
