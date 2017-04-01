@@ -1,56 +1,92 @@
-from pyactor.context import set_context, create_host, sleep, serve_forever
+from pyactor.context import set_context, create_host, sleep, serve_forever, interval
 from pyactor.exceptions import TimeoutError
+import random
 
 
 class Tracker(object):
-    _tell = ['announce', 'test', 'get_swarms']
+    _tell = ['announce', 'init_start', 'check_peers']
     _ask = ['get_peers']
-    _ref = ['announce']
-    
+    _ref = ['announce', 'get_peers']
+
     # Inicializador de la instancia del Tracker
     def __init__(self):
-        self.swarmList = {}
+        self.swarmDic = {}
         self.ttl = 10
+        self.interval1 = None
 
-    def test(self, msg):
-        print msg
+    def init_start(self):
+        # Programamos el intervalo que comprobara el ttl de los peer's cada segundo
+        self.interval1 = interval(self.host, 1, self.proxy, 'check_peers')
 
-    # Funcion 'announce' del Tracker
+    # Metodo 'announce' del Tracker
+    # Guarda un diccionario 'swarmDic' de pares clave-valor -> {'torrent_hash': peers_dic{}}
+    # A su vez 'peers_dic' es un diccionario de los pares clave-valor -> {'peer_ref': [peer_proxy, ttl]}
     def announce(self, torrent_hash, peer_ref):
         # Comprobamos si existe el swarm del torrent_hash
-        if torrent_hash in self.swarmList:
+        if torrent_hash in self.swarmDic:
             # Comprobamos si el peer existe en el swarm
-            if peer_ref in self.swarmList[torrent_hash]:
+            if str(peer_ref) in self.swarmDic[torrent_hash]:
                 # Si existe le restauramos el ttl
-                self.swarmList[torrent_hash][peer_ref] = self.ttl
-
-                print 'Announce from: ' + peer_ref # -----DEBUGGING LINE-----
+                self.swarmDic[torrent_hash][str(peer_ref)][1] = self.ttl
+                #print 'Announce from: ' + str(peer_ref)  # -----DEBUGGING LINE-----
             else:
-                self.swarmList[torrent_hash][peer_ref] = self.ttl
+                # si no existe lo incorporamos en el swarm
+                self.swarmDic[torrent_hash][str(peer_ref)] = [peer_ref, self.ttl]
         else:
             # Sino existe el swarm lo creamos y incorporamos el peer
-            self.swarmList[torrent_hash] = {peer_ref: self.ttl}
-            #print self.swarmList
+            self.swarmDic[torrent_hash] = {str(peer_ref): [peer_ref, self.ttl]}
 
-
-    # Funcion 'get_peers'
+    # Metodo 'get_peers'
+    # Devuelve una lista de proxys de 3 peers aleatorios.
+    # En caso de tener un numero de proxys menor o igual a 3, retorna los 3 disponibles.
     def get_peers(self, torrent_hash):
-        if torrent_hash in self.swarmList:
-            return self.swarmList[torrent_hash].keys()
+        # Variable que contendra los proxies de los peers a devolver
+        peers_2_return = []
+        # Comprobamos que el swarm del torrent_hash existe
+        if torrent_hash in self.swarmDic:
+            peers_key = self.swarmDic[torrent_hash].keys()
+            # Guardamos el numero de peers del swarm del hash
+            num_peers = len(self.swarmDic[torrent_hash])
 
-    def check_peers(selfself):
-        pass
+            #  Caso en que haya mas de tres peers en el swarm
+            if num_peers > 3:
+                random_nums = []
+                for i in range(0, 3):
+                    # Escogemos un numero aleatorio entre 0 y num_peers
+                    random_num = random.randrange(num_peers)
+                    # Comprobamos que no lo tengamos seleccionado
+                    while random_num in random_nums:
+                        random_num = random.randrange(num_peers)
+                    random_nums.append(random_num)
+                for i in range(0, 3):
+                    peers_2_return.append(self.swarmDic[torrent_hash][peers_key[random_nums[i]]][0])
+            else:
+                # Si disponemos menos de 3 devolvemos todos
+                for i in range(0, num_peers):
+                    peers_2_return.append(self.swarmDic[torrent_hash][peers_key[i]][0])
 
-    def get_swarms(self):
-        print self.swarmList
+        return peers_2_return
 
+    # Metodo que se encarga de comprobar el ttl de los peers
+    # y eliminar de cada swarm aquellos que no estan activos
+    def check_peers(self):
+        for swarm in self.swarmDic:
+            if bool(self.swarmDic[swarm]):
+                temp_dic = {}
+                for peer in self.swarmDic[swarm]:
+                    # Restamos el ttl una unidad
+                    self.swarmDic[swarm][peer][1] -= 1
+                    if self.swarmDic[swarm][peer][1] != 0:
+                        temp_dic[peer] = self.swarmDic[swarm][peer]
+                    else:
+                        print str(peer) + " removed form the swarm"
+                self.swarmDic[swarm] = temp_dic
+                #print self.swarmDic[swarm]
+            else:
+                # si el swarm no tiene peers lo eliminamos
+                # print 'el swarm \'' + swarm + '\' esta vacio'
+                del self.swarmDic[swarm]
 
-class Peer(object):
-    _tell = ['send']
-    _ask = []
-
-    def send(self, trck):
-        trck.test('Hola desde peer')
 
 if __name__ == "__main__":
     # Inicializacion del contexto de la ejecucion del host
@@ -58,15 +94,13 @@ if __name__ == "__main__":
     set_context()
 
     # Creacion del host que engendra el tracker
-    h = create_host('http://127.0.0.1:1277/')
+    host = create_host('http://127.0.0.1:1277/')
 
     # Generacion del 'tracker'
-    tck = h.spawn('tracker', Tracker)
-    #print tck
+    tracker = host.spawn('tracker', Tracker)
 
-    #print tck.get_peers('hash1')
+    # Inicializacion del tracker
+    tracker.init_start()
 
-    #p1 = h.spawn('peer1', Peer)
-    #p1.send(tck)
-
+    # El tracker se mantiene vivo de forma indefinida
     serve_forever()
